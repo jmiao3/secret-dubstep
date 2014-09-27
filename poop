@@ -1,0 +1,149 @@
+/ Generate random variables from a provided distribution
+pi:acos -1 
+normrnd:{$[x=2*n:x div 2;raze sqrt[-2*log n?1f]*/:(sin;cos)@\:(2*pi)*n?1f;-1_.z.s 1+x]}
+
+/ Simulate an arithmetic random walk
+([]100+sums 2*normrnd 1000)
+/ Simulate a geometric random walk
+([]100*exp sums 0.1*normrnd 1000)
+/ Simulate a general multidimensional Ito process
+dim: 2
+mu:{[X;t] (dim, 1) # 0.0f }
+sigma:{[X;t] (dim, dim) # 0.01 0.005 0.005 0.01f}
+X: (dim, 1) # 100 100
+t:0
+sim_step:{[X;t;dt;dW] (dt*mu[X;t]) + (sqrt dt) * sigma[X;t] mmu dW}
+do[1000; X:X+sim_step[X;0;1;dW[dim]]]
+X
+
+path: () / return a path
+num_steps: 100
+do[num_steps; path: (path, sim_step[X;0;1;dW[dim]]) ]
+path:(num_steps,dim)#path
+path:X +/: (sums path)
+([Time:til num_steps] (flip path)[0];(flip path)[1])
+
+/ covariance matrix (8 times faster than x cov/:\:x)
+cvm:{(x+flip(not n=\:n)*x:(n#'0.0),'(x$/:'(n:til count x)_\:x)%count first x)-a*\:a:avg each x}
+/ correlation matrix
+crm:{cvm[x]%u*/:u:dev each x}
+
+/ HY Autocorrelation estimator
+n1:3000
+n2:3000
+ls1:([]sym:n1#`ts; time:09:30:00 + sums (1 + n1 ? 10); ret: -0.5 + n1 ? 1f)
+ls2:([]sym:n2#`ts; time:09:30:00 + sums (1 + n2 ? 10); ret: -0.5 + n2 ? 2f)
+w:(2,(count ls1.time))#(ls1.time,(1_ls1.time-1),(last ls1.time))
+f:`time         / common field
+res:wj1[w;f;ls1;(ls2;(::;`ret))]
+hycov:sum raze ls1.ret * res.ret
+hycov
+
+/ Event study
+n1:3050
+n2:1000
+horizon:20
+event:([]sym:n1#`ts; time:09:30:00 + sums (1 + n1 ? 100); code: n1 ? 2) 
+prices:([]sym:n2#`ts; time:09:30:00 + sums (1 + n2 ? 100); mid: 100 + n2 ? 20)
+f:`time         / common field
+w:(2,(count event.time))#(event.time,event.time + horizon)
+res:wj[w;f;event;(price;(::;`mid))]
+chg: last each res.mid - first each res.mid
+avg chg
+
+/ Linear regression
+data:([] x: -1 + 10000 ? 2; y: -1 + 10000 ? 2)
+regxy[flip x; flip y]
+regxy:{[x;y] (sum x*y) % sum (x*x)}
+regxy[data.x;data.y]
+
+/ Matrix Mult
+c:3 3#2 4 8 3 5 6 0 7 1f
+x:3 1#1 2 3f
+c mmu x
+1=c mmu inv c 
+flip c
+
+
+
+/find element
+1 2 4 5 2 ? 1
+
+/ Import data from a CSV into a table 
+d:d2
+d:1!d 
+c: select c0,c1 from d
+c:1!c
+fk:delete from deltas c where i=0
+
+t:(1!t)
+reverse t
+
+a:select Date,Open:type from d
+select Open by Date from d  / This sets the by argument as the primary key
+meta d / Returns the type of each column
+ls:deltas log select Open from d
+ls:1_ls
+
+ema:{first[y] (1-x) \ x*y}
+
+//Bootstrap from a provided list and resample size
+list:3 1 4 1 5 9 2 6 5 3 5 8 9 7 9 3 2 3 8 4 6 2 6 4 3 3 8 3 2 7 9 5;
+
+nResamples:100;   
+myStat:{(avg x*x) - (avg x) xexp 2}
+ls:raze flip ls /how to convert from a column to a list
+
+//Bootstrapping function (Godlike version)
+bootstrap:{[list;stat;nr] stat flip (nr;count list)#nr?list}
+a:bootstrap[ls;myStat;100000
+([]a) /print to screen
+
+/ Obtain the bootstrap percentiles
+percentile:{[ls;pct] (asc ls) ["i"$(1 xbar (pct*(count ls)%100) )] }
+percentile[a;2.5]
+percentile[a;97.5]
+
+/ K-nearest neighbour algorithm
+K:3
+N:50   / number of data points (vectors) in the sample
+M:3    / dimension of each vector
+data: ([idx:til N; y: (N*1)?100] x:(N,M)#(N*M)?100)   /must be in this format!
+norm:{[x;y] (sum (raze x-raze y) xexp 2) xexp 0.5}  
+query: 0 0 0
+/ we can partially specify the arguments to a function
+res:asc norm[query; ] each data 
+a:(raze avg (key res)[til K])[1] / calculate the forecast mean
+
+//Bootstrapping function (Mortal version)
+bootstrap:{[list;myStat;nResamples] 
+    nSampleSize:count list;
+    sel: (nResamples * nSampleSize) ? nSampleSize;  / Create random selection matrix
+    sel: (nResamples;nSampleSize) # sel;            
+    samples:list[sel];                              / Apply matrix to data
+    myStat flip samples                             / Apply the statistic and return    
+}    
+
+//Intended function usage
+bootstrap[list;myStat;nResamples]
+
+//Pascal's Triangle
+ls: 1
+ls: (0,ls)+(ls,0); ls
+
+//Joining two lists as columns
+ls: 1 12 312 2 2
+ls2: 2 2 44 4 5 
+ls,'ls2  / very useful for joining tables with the same number of elements
+
+//Applying the adverb 'each' - applies functions elementwise
+ls: (1 12; 2; `kwe`kk`ir)
+each[reverse] ls
+
+/Over adverb applies the right to the left
+1 +/ 4 2 3
+/Scan applies the left to the right
+1 +\ 4 2 3
+
+tab:([]normrnd 500000)
+tab
