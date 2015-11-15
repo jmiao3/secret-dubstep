@@ -3,6 +3,7 @@ James Miao
 // Objective
 
 The idea is to develop some Machine Learning/Stats/Time Series Analysis tools for analysis of data.
+[UPDATE] Yeah, if I had time! 
 
 // Structure
 
